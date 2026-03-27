@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.env
+backend/.env
+frontend/.env
+*.log
+backend/ml/artifacts/*
+!backend/ml/artifacts/.gitkeep
+backend/ml/artifacts/plots/*
+!backend/ml/artifacts/plots/.gitkeep

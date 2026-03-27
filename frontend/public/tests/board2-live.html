@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Board 2 Live Test</title>
+  <style>
+    :root {
+      --bg: #f4f8f4;
+      --panel: #ffffff;
+      --text: #15221a;
+      --muted: #5e6d64;
+      --ok: #0b7a3e;
+      --warn: #8a6d00;
+      --err: #b42318;
+      --line: #d8e6da;
+      --accent: #1d7b4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, #dff3e5 0%, var(--bg) 45%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; display: grid; gap: 14px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(7, 43, 24, 0.06);
+    }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    .muted { color: var(--muted); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    input {
+      flex: 1;
+      min-width: 240px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    button {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary { background: #5e6d64; }
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .ok { background: #dcfce7; color: var(--ok); }
+    .warn { background: #fff7d6; color: var(--warn); }
+    .err { background: #fee4e2; color: var(--err); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfffc;
+    }
+    .label { font-size: 0.78rem; color: var(--muted); }
+    .value { margin-top: 4px; font-size: 1.15rem; font-weight: 700; }
+    pre {
+      margin: 0;
+      background: #0b2d1f;
+      color: #d6ffe9;
+      border-radius: 10px;
+      padding: 10px;
+      overflow: auto;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card">
+      <h1>Board 2 Live Test (COM3)</h1>
+      <div class="muted">USB serial board (BH1750 + BLE beacon) via backend secondary status endpoint.</div>
+      <div style="margin-top: 10px" class="row">
+        <input id="endpoint" value="http://localhost:5001/api/device/secondary/status" />
+        <button id="apply">Apply</button>
+        <button id="poll" class="secondary">Pause</button>
+      </div>
+      <div style="margin-top: 10px" class="row">
+        <button id="monitorOn">Monitor ON (Board 2)</button>
+        <button id="monitorOff" class="secondary">Monitor OFF (Board 2)</button>
+        <span id="commandStatus" class="muted">Command status: --</span>
+      </div>
+      <div style="margin-top:10px" class="row">
+        <span id="conn" class="status warn">Checking...</span>
+        <span id="time" class="muted">Last update: --</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="grid" id="metrics"></div>
+    </section>
+
+    <section class="card">
+      <div class="muted" style="margin-bottom:8px">Raw JSON</div>
+      <pre id="raw">{}</pre>
+    </section>
+  </div>
+
+  <script>
+    const endpointInput = document.getElementById("endpoint");
+    const conn = document.getElementById("conn");
+    const timeEl = document.getElementById("time");
+    const raw = document.getElementById("raw");
+    const metrics = document.getElementById("metrics");
+    const pollBtn = document.getElementById("poll");
+    const commandStatus = document.getElementById("commandStatus");
+
+    let endpoint = endpointInput.value.trim();
+    let polling = true;
+
+    function metric(label, value) {
+      return `<div class="metric"><div class="label">${label}</div><div class="value">${value ?? "--"}</div></div>`;
+    }
+
+    function safe(v, unit = "") {
+      if (v === null || v === undefined || Number.isNaN(v)) return "--";
+      return `${v}${unit}`;
+    }
+
+    function render(data) {
+      const s = data?.status || data || {};
+      const connected = !!s.connected;
+      const stale = Boolean(s.isStale);
+      const showLiveValues = connected && !stale;
+
+      const shownLux = showLiveValues ? s.lux : null;
+      const shownRssiA = showLiveValues ? s.rssiA : null;
+      const shownRssiB = showLiveValues ? s.rssiB : null;
+      const shownRssiC = showLiveValues ? s.rssiC : null;
+      const shownBeacon = showLiveValues ? s.nearestBeacon : null;
+      const shownRoom = showLiveValues ? s.nearestRoom : null;
+      const shownLastLine = showLiveValues ? s.lastLine : null;
+
+      metrics.innerHTML = [
+        metric("Connected", connected ? "YES" : "NO"),
+        metric("Data", showLiveValues ? "LIVE" : "RECOVERING"),
+        metric("Monitoring", s.monitoringEnabled ? "ON" : "OFF"),
+        metric("Port", s.portPath || "COM3"),
+        metric("Baud", safe(s.baudRate)),
+        metric("Lux", safe(shownLux, " lx")),
+        metric("RSSI A", safe(shownRssiA)),
+        metric("RSSI B", safe(shownRssiB)),
+        metric("RSSI C", safe(shownRssiC)),
+        metric("Nearest Beacon", shownBeacon || "--"),
+        metric("Nearest Room", shownRoom || "--"),
+        metric("Last Line", shownLastLine || "--"),
+      ].join("");
+
+      raw.textContent = JSON.stringify(data, null, 2);
+      if (!connected) {
+        conn.className = "status err";
+        conn.textContent = "OFFLINE";
+      } else if (stale) {
+        conn.className = "status warn";
+        conn.textContent = "RECOVERING";
+      } else {
+        conn.className = "status ok";
+        conn.textContent = "ONLINE";
+      }
+      timeEl.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+    }
+
+    async function tick() {
+      if (!polling) return;
+      try {
+        const res = await fetch(endpoint, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        conn.className = "status err";
+        conn.textContent = "OFFLINE";
+        timeEl.textContent = `Last error: ${e.message}`;
+      }
+    }
+
+    document.getElementById("apply").addEventListener("click", () => {
+      endpoint = endpointInput.value.trim();
+      tick();
+    });
+
+    async function sendMonitorCommand(state) {
+      try {
+        const res = await fetch(`http://localhost:5001/api/device/secondary/monitor/${state}`, {
+          method: "GET",
+          cache: "no-store"
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        commandStatus.textContent = `Command status: ${data.message || `monitor ${state}`}`;
+        tick();
+      } catch (e) {
+        commandStatus.textContent = `Command status: failed (${e.message})`;
+      }
+    }
+
+    document.getElementById("monitorOn").addEventListener("click", () => sendMonitorCommand("on"));
+    document.getElementById("monitorOff").addEventListener("click", () => sendMonitorCommand("off"));
+
+    pollBtn.addEventListener("click", () => {
+      polling = !polling;
+      pollBtn.textContent = polling ? "Pause" : "Resume";
+      if (polling) tick();
+    });
+
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>

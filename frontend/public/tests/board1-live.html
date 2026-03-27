@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Board 1 Live Test</title>
+  <style>
+    :root {
+      --bg: #f4f7f9;
+      --panel: #ffffff;
+      --text: #0f1720;
+      --muted: #5a6978;
+      --ok: #0b7a3e;
+      --warn: #9a6700;
+      --err: #b42318;
+      --line: #d9e2ea;
+      --accent: #1769aa;
+      --accent2: #0f5a8f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top right, #d9eaf7 0%, var(--bg) 45%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; display: grid; gap: 14px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(7,29,43,0.06);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 10px; color: var(--accent); }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .mt { margin-top: 10px; }
+    input {
+      flex: 1; min-width: 260px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+    button {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      border-radius: 10px;
+      padding: 9px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #5a6978; }
+    button.green  { background: #1b7a42; }
+    button.amber  { background: #9a6700; }
+    .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .ok   { background: #dcfce7; color: var(--ok); }
+    .warn { background: #fff7d6; color: var(--warn); }
+    .err  { background: #fee4e2; color: var(--err); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #f8fbff;
+    }
+    .metric .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+    .metric .value { margin-top: 5px; font-size: 1.15rem; font-weight: 700; }
+    .metric .sub   { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+    .prog-bar-wrap { height: 8px; background: #e8edf2; border-radius: 99px; overflow: hidden; margin-top: 6px; }
+    .prog-bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.4s; }
+    pre {
+      background: #0b253a;
+      color: #d7ecff;
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      font-size: 0.78rem;
+      max-height: 340px;
+    }
+    #cmd-status { font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <section class="card">
+    <h1>Board 1 Live Test</h1>
+    <div class="muted">WiFi board · sensors · BLE · calculated values via backend proxy</div>
+
+    <div class="row mt">
+      <input id="endpoint" value="http://localhost:5001/api/device/status" />
+      <button id="applyBtn">Apply</button>
+      <button id="pollBtn" class="secondary">Pause</button>
+    </div>
+
+    <div class="row mt">
+      <button id="monOnBtn"  class="green">Monitor ON</button>
+      <button id="monOffBtn" class="amber">Monitor OFF</button>
+      <span id="cmd-status" class="muted">Command: --</span>
+    </div>
+
+    <div class="row mt">
+      <span id="conn" class="status warn">Checking…</span>
+      <span id="timeEl" class="muted">Last update: --</span>
+    </div>
+  </section>
+
+  <!-- Device info -->
+  <section class="card">
+    <div class="section-label">Device &amp; Session</div>
+    <div class="grid" id="deviceGrid"></div>
+  </section>
+
+  <!-- Round progress -->
+  <section class="card">
+    <div class="section-label">Round Progress</div>
+    <div class="grid" id="progressGrid"></div>
+    <div class="prog-bar-wrap mt">
+      <div class="prog-bar" id="progressBar" style="width:0%"></div>
+    </div>
+  </section>
+
+  <!-- Sensor calculated values (latest round) -->
+  <section class="card">
+    <div class="section-label">Sensor Calculated Values (latest round average)</div>
+    <div class="grid" id="sensorGrid"></div>
+  </section>
+
+  <!-- BLE calculated values -->
+  <section class="card">
+    <div class="section-label">BLE Beacon Values (latest round)</div>
+    <div class="grid" id="bleGrid"></div>
+  </section>
+
+  <!-- Raw JSON -->
+  <section class="card">
+    <div class="section-label">Raw JSON</div>
+    <pre id="rawPre">{}</pre>
+  </section>
+
+</div>
+
+<script>
+  const ROOM_MAP = {
+    "corner a": "Living room",
+    "corner b": "Bed room",
+    "corner c": "Library"
+  };
+  const BEACON_MAP = {
+    "corner a": "beaconA",
+    "corner b": "beaconB",
+    "corner c": "beaconC"
+  };
+
+  const endpointInput = document.getElementById("endpoint");
+  const conn          = document.getElementById("conn");
+  const timeEl        = document.getElementById("timeEl");
+  const rawPre        = document.getElementById("rawPre");
+  const deviceGrid    = document.getElementById("deviceGrid");
+  const progressGrid  = document.getElementById("progressGrid");
+  const progressBar   = document.getElementById("progressBar");
+  const sensorGrid    = document.getElementById("sensorGrid");
+  const bleGrid       = document.getElementById("bleGrid");
+  const pollBtn       = document.getElementById("pollBtn");
+  const cmdStatus     = document.getElementById("cmd-status");
+
+  let endpoint = endpointInput.value.trim();
+  let polling  = true;
+  const NUM_ROUNDS = 10;
+
+  // ── helpers ──────────────────────────────────────────────────────────
+  function m(label, value, sub = "") {
+    return `<div class="metric">
+      <div class="label">${label}</div>
+      <div class="value">${value ?? "--"}</div>
+      ${sub ? `<div class="sub">${sub}</div>` : ""}
+    </div>`;
+  }
+
+  function fmt(v, unit = "", digits = 2) {
+    if (v === null || v === undefined || (typeof v === "number" && (isNaN(v) || !isFinite(v)))) return "--";
+    if (typeof v === "number") return v.toFixed(digits) + unit;
+    return String(v) + unit;
+  }
+
+  function rssiToDistance(rssi, txPower = -59, n = 2.5) {
+    if (!rssi || rssi <= -999) return null;
+    return Math.pow(10, (txPower - rssi) / (10 * n));
+  }
+
+  function trilaterate(dA, dB, dC) {
+    // Beacon positions: A=(0,0), B=(2,0), C=(1,1.73)
+    const Bx = 2, Cx = 1, Cy = 1.73;
+    const x = (dA * dA - dB * dB + Bx * Bx) / (2 * Bx);
+    const y = (dA * dA - dC * dC + Cx * Cx + Cy * Cy - 2 * Cx * x) / (2 * Cy);
+    return { x, y };
+  }
+
+  function nearestCornerFromRssi(rA, rB, rC) {
+    if (!rA || !rB || !rC || rA <= -999 || rB <= -999 || rC <= -999) return null;
+    const dA = rssiToDistance(rA), dB = rssiToDistance(rB), dC = rssiToDistance(rC);
+    const pos = trilaterate(dA, dB, dC);
+    const A = { x: 0,   y: 0 },
+          B = { x: 2,   y: 0 },
+          C = { x: 1,   y: 1.73 };
+    const dist = (p, q) => Math.sqrt((p.x - q.x) ** 2 + (p.y - q.y) ** 2);
+    const dists = [
+      { corner: "corner a", r: dist(pos, A) },
+      { corner: "corner b", r: dist(pos, B) },
+      { corner: "corner c", r: dist(pos, C) }
+    ];
+    dists.sort((a, b) => a.r - b.r);
+    return { corner: dists[0].corner, pos };
+  }
+
+  // ── render ────────────────────────────────────────────────────────────
+  function render(data) {
+    // Normalise: backend wraps as { deviceStatus } or may unwrap already
+    const raw = data?.deviceStatus ?? data;
+    if (!raw) return;
+
+    // ── device & session ──────────────────────────────────
+    deviceGrid.innerHTML = [
+      m("Device ID",   raw.deviceId  || "--"),
+      m("IP",          raw.ip        || "--"),
+      m("WiFi",        raw.wifiConnected ? "Connected" : "Disconnected"),
+      m("Session",     raw.monitoringSessionId || "--"),
+      m("Monitoring",  raw.monitoringEnabled ? "ON" : "OFF"),
+    ].join("");
+
+    // ── round progress ────────────────────────────────────
+    const currentRound   = typeof raw.currentRound === "number" ? raw.currentRound : null;
+    const roundsCaptured = typeof raw.roundsCaptured === "number" ? raw.roundsCaptured : null;
+    const pct = currentRound !== null ? Math.min(100, Math.round(((currentRound - 1) / NUM_ROUNDS) * 100)) : 0;
+    progressBar.style.width = pct + "%";
+
+    progressGrid.innerHTML = [
+      m("Current Round",    currentRound   !== null ? `${currentRound} / ${NUM_ROUNDS}` : "--"),
+      m("Rounds Captured",  roundsCaptured !== null ? roundsCaptured : "--"),
+      m("Batch Progress",   raw.monitoringEnabled ? `${pct}%` : "Paused"),
+    ].join("");
+
+    // ── sensor values from latestRound ────────────────────
+    const lr = raw.latestRound || {};
+    const hasRound = lr && typeof lr === "object" && Object.keys(lr).length > 0;
+
+    sensorGrid.innerHTML = hasRound ? [
+      m("Round #",      lr.round ?? "--"),
+      m("Air Temp",     fmt(lr.airTempC,    " °C")),
+      m("Root Temp",    fmt(lr.rootTempC,   " °C")),
+      m("Humidity",     fmt(lr.humidity,    " %")),
+      m("Soil Moisture",fmt(lr.soilPercent, " %")),
+      m("MQ Ratio",     fmt(lr.mqRatio,     "",   3)),
+      m("MQ PPM",       fmt(lr.mqPPM,       " ppm")),
+      m("Weight",       fmt(lr.weightG,     " g")),
+      m("Weight ±",     fmt(lr.weightError, " g", 3)),
+    ].join("") : `<div class="muted">No round data yet — start monitoring to collect sensor values.</div>`;
+
+    // ── BLE values ────────────────────────────────────────
+    const ble = lr.ble || {};
+    const rA = ble.rssiA ?? lr.bleRssiA ?? null;
+    const rB = ble.rssiB ?? lr.bleRssiB ?? null;
+    const rC = ble.rssiC ?? lr.bleRssiC ?? null;
+    const dA = ble.distA ?? lr.bleDistA ?? (rA ? rssiToDistance(rA) : null);
+    const dB = ble.distB ?? lr.bleDistB ?? (rB ? rssiToDistance(rB) : null);
+    const dC = ble.distC ?? lr.bleDistC ?? (rC ? rssiToDistance(rC) : null);
+    const bX = ble.x ?? lr.bleX ?? null;
+    const bY = ble.y ?? lr.bleY ?? null;
+
+    // Derived nearest if firmware didn't return it
+    let nearestCornerKey = null;
+    let calcX = bX, calcY = bY;
+    if (rA && rB && rC && rA > -999 && rB > -999 && rC > -999) {
+      const nr = nearestCornerFromRssi(rA, rB, rC);
+      if (nr) {
+        nearestCornerKey = nr.corner;
+        if (calcX === null) calcX = nr.pos.x;
+        if (calcY === null) calcY = nr.pos.y;
+      }
+    }
+
+    const hasBlE = rA !== null || rB !== null || rC !== null;
+    bleGrid.innerHTML = hasBlE ? [
+      m("RSSI A",          fmt(rA)),
+      m("RSSI B",          fmt(rB)),
+      m("RSSI C",          fmt(rC)),
+      m("Distance A",      dA !== null ? fmt(dA, " m") : "--"),
+      m("Distance B",      dB !== null ? fmt(dB, " m") : "--"),
+      m("Distance C",      dC !== null ? fmt(dC, " m") : "--"),
+      m("Plant X",         calcX !== null ? fmt(calcX, " m") : "--"),
+      m("Plant Y",         calcY !== null ? fmt(calcY, " m") : "--"),
+      m("Nearest Corner",  nearestCornerKey ? BEACON_MAP[nearestCornerKey] || nearestCornerKey : "--"),
+      m("Nearest Room",    nearestCornerKey ? ROOM_MAP[nearestCornerKey] || "--" : "--"),
+    ].join("") : `<div class="muted">No BLE data in latest round yet.</div>`;
+
+    // ── status chip ───────────────────────────────────────
+    rawPre.textContent  = JSON.stringify(data, null, 2);
+    conn.className      = "status ok";
+    conn.textContent    = "ONLINE";
+    timeEl.textContent  = `Last update: ${new Date().toLocaleTimeString()}`;
+  }
+
+  // ── poll ──────────────────────────────────────────────────────────────
+  async function tick() {
+    if (!polling) return;
+    try {
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      conn.className = "status err";
+      conn.textContent = "OFFLINE";
+      timeEl.textContent = `Error: ${e.message}`;
+    }
+  }
+
+  // ── monitor commands ──────────────────────────────────────────────────
+  async function sendMonitor(state) {
+    const btn = state === "on" ? document.getElementById("monOnBtn") : document.getElementById("monOffBtn");
+    btn.disabled = true;
+    cmdStatus.textContent = `Sending monitor ${state.toUpperCase()}…`;
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/device/monitor/${state}?_ts=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        cmdStatus.textContent = `Error: ${data?.message || "HTTP " + res.status}`;
+      } else {
+        cmdStatus.textContent = data?.message || `Monitor ${state.toUpperCase()} sent.`;
+        tick();
+      }
+    } catch (e) {
+      cmdStatus.textContent = `Failed: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── events ────────────────────────────────────────────────────────────
+  document.getElementById("applyBtn").addEventListener("click", () => {
+    endpoint = endpointInput.value.trim();
+    tick();
+  });
+  document.getElementById("monOnBtn").addEventListener("click",  () => sendMonitor("on"));
+  document.getElementById("monOffBtn").addEventListener("click", () => sendMonitor("off"));
+
+  pollBtn.addEventListener("click", () => {
+    polling = !polling;
+    pollBtn.textContent = polling ? "Pause" : "Resume";
+    if (polling) tick();
+  });
+
+  tick();
+  setInterval(tick, 1500);
+</script>
+</body>
+</html>

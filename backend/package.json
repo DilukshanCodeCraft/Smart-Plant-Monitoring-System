@@ -1,0 +1,28 @@
+{
+  "name": "smart-plant-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "init:db": "node scripts/initDatabase.js",
+    "ml:train": "python ml/train_timeseries_regression.py",
+    "ml:train:soil": "python ml/train_timeseries_regression.py --target soilPercent --collection roundreadings",
+    "ml:train:weight": "python ml/train_timeseries_regression.py --target weightG --collection roundreadings",
+    "ml:predict": "python ml/predict_next_from_model.py"
+  },
+  "dependencies": {
+    "@serialport/parser-readline": "^12.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.10.0",
+    "morgan": "^1.10.0",
+    "serialport": "^12.0.0",
+    "multer": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "smart-plant-monitoring-system",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace backend",
+    "init:db": "npm run init:db --workspace backend",
+    "ml:train": "npm run ml:train --workspace backend",
+    "ml:train:soil": "npm run ml:train:soil --workspace backend",
+    "ml:train:weight": "npm run ml:train:weight --workspace backend",
+    "ml:predict": "npm run ml:predict --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
